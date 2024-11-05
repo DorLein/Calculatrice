@@ -1,12 +1,11 @@
 pipeline {
     agent any
-     triggers {
-      pollSCM('* * * * *')
-      
+
+    triggers {
+        pollSCM('* * * * *')  //
     }
 
     stages {
-
         stage("Compilation") {
             steps {
                 sh "./gradlew compileJava"
@@ -30,7 +29,8 @@ pipeline {
                 sh "./gradlew jacocoTestCoverageVerification"
             }
         }
-         stage("Analyse statique du code") {
+
+        stage("Analyse statique du code") {
             steps {
                 sh "./gradlew checkstyleMain"
                 publishHTML(target: [
@@ -40,9 +40,6 @@ pipeline {
                 ])
             }
         }
-
-       
-
     }
 }
 

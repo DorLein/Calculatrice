@@ -41,5 +41,12 @@ pipeline {
             }
         }
     }
+    post {
+ always {
+ mail to: 'abdellah.salahi@gmail.com',
+ subject: "Nouveau notification: ${currentBuild.fullDisplayName}",
+ body: " Votre build est accompli, Veuilez vérifier: ${env.BUILD_URL}"
+ }
+ }
 }
 

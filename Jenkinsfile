@@ -1,52 +1,86 @@
 pipeline {
     agent any
-
-    triggers {
-        pollSCM('* * * * *')  //
-    }
-
     stages {
-        stage("Compilation") {
+        stage('Checkout') {
             steps {
-                sh "./gradlew compileJava"
+                checkout scm
             }
         }
-
-        stage("Test unitaire") {
+        stage('Compilation') {
             steps {
-                sh "./gradlew test"
+                sh './gradlew compileJava'
             }
         }
-
-        stage("Couverture de code") {
+        stage('Test unitaire') {
             steps {
-                sh "./gradlew jacocoTestReport"
+                sh './gradlew test'
+            }
+        }
+        stage('Couverture de code') {
+            steps {
+                sh './gradlew jacocoTestReport'
                 publishHTML(target: [
+                    reportName: 'Rapport JaCoCo',
                     reportDir: 'build/reports/jacoco/test/html',
-                    reportFiles: 'index.html',
-                    reportName: "Rapport JaCoCo"
+                    reportFiles: 'index.html'
                 ])
-                sh "./gradlew jacocoTestCoverageVerification"
             }
         }
-
-        stage("Analyse statique du code") {
+        stage('Analyse statique du code') {
             steps {
-                sh "./gradlew checkstyleMain"
+                sh './gradlew checkstyleMain'
                 publishHTML(target: [
-                    reportDir: 'build/reports/checkstyle/',
-                    reportFiles: 'main.html',
-                    reportName: "Checkstyle Report"
+                    reportName: 'Checkstyle Report',
+                    reportDir: 'build/reports/checkstyle',
+                    reportFiles: 'main.html'
                 ])
+            }
+        }
+        stage('Package') {
+            steps {
+                sh './gradlew build'
+            }
+        }
+        stage('Docker build') {
+            steps {
+                sh "docker build -t localhost:5000/calculatrice ."
+            }
+        }
+        stage('Docker push') {
+            steps {
+                sh "docker push localhost:5000/calculatrice"
+            }
+        }
+        stage('Déploiement sur staging') {
+            when {
+                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+            }
+            steps {
+                echo 'Déploiement en cours...'
+                // Ajoutez ici les commandes pour le déploiement en staging
+            }
+        }
+        stage('Test d\'acceptation') {
+            when {
+                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+            }
+            steps {
+                echo 'Tests d\'acceptation en cours...'
+                // Ajoutez ici les tests d'acceptation
             }
         }
     }
     post {
- always {
- mail to: 'abdellah.salahi@gmail.com',
- subject: "Nouveau notification: ${currentBuild.fullDisplayName}",
- body: " Votre build est accompli, Veuilez vérifier: ${env.BUILD_URL}"
- }
- }
+        always {
+            script {
+                try {
+                    sh "docker stop calculatrice"
+                    sh "docker rm calculatrice"
+                } catch (Exception e) {
+                    echo "Aucun conteneur Docker à arrêter"
+                }
+            }
+        }
+    }
 }
 

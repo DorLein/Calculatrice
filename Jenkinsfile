@@ -63,7 +63,7 @@ pipeline {
         stage("Deploy to staging ou déployer en préproduction") {
             steps {
                 sh "docker rm -f calculatrice || true"
-                sh "docker run -d --rm -p 8882:8081 --name calculatrice localhost:5000/calculatrice"
+                sh "docker run -d -p 8882:8081 --name calculatrice localhost:5000/calculatrice"
             }
         }
 
@@ -80,8 +80,10 @@ pipeline {
         always {
             script {
                 try {
-                    sh "docker stop calculatrice"
-                    sh "docker rm calculatrice"
+                    // Check if the container exists before stopping/removing
+                    sh "docker ps -q -f name=calculatrice || true"  // This checks if the container is running
+                    sh "docker stop calculatrice || true"
+                    sh "docker rm calculatrice || true"
                 } catch (Exception e) {
                     echo "Aucun conteneur Docker à arrêter"
                 }

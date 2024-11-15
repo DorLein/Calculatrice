@@ -3,61 +3,70 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'localhost:5000/calculatrice'
-        DOCKER_CONTAINER = 'calculatrice'
+        DOCKER_CONTAINER_NAME = 'calculatrice'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout scm  // Ensure this step checks out your repository correctly
+                checkout scm
             }
         }
-        
+
         stage('Compilation') {
             steps {
-                sh './gradlew compileJava'
+                script {
+                    sh './gradlew compileJava'
+                }
             }
         }
 
         stage('Test unitaire') {
             steps {
-                sh './gradlew test'
+                script {
+                    sh './gradlew test'
+                }
             }
         }
 
         stage('Couverture de code') {
             steps {
-                sh './gradlew jacocoTestReport'
-                publishHTML(target: [
-                    reportName: 'Code Coverage',
-                    reportDir: 'build/reports/jacoco/test/html',
-                    reportFiles: 'index.html'
-                ])
+                script {
+                    sh './gradlew jacocoTestReport'
+                    publishHTML(target: [
+                        reportName: 'Code Coverage',
+                        reportDir: 'build/reports/jacoco/test/html',
+                        reportFiles: 'index.html'
+                    ])
+                }
             }
         }
 
         stage('Analyse statique du code') {
             steps {
-                sh './gradlew checkstyleMain'
-                publishHTML(target: [
-                    reportName: 'Checkstyle Report',
-                    reportDir: 'build/reports/checkstyle',
-                    reportFiles: 'main.html'
-                ])
+                script {
+                    sh './gradlew checkstyleMain'
+                    publishHTML(target: [
+                        reportName: 'Checkstyle Report',
+                        reportDir: 'build/reports/checkstyle',
+                        reportFiles: 'index.html'
+                    ])
+                }
             }
         }
 
         stage('Package') {
             steps {
-                sh './gradlew build'
+                script {
+                    sh './gradlew build'
+                }
             }
         }
 
         stage('Docker build') {
             steps {
                 script {
-                    // Build the Docker image
-                    sh 'docker build -t $DOCKER_IMAGE .'
+                    sh 'docker build -t ${DOCKER_IMAGE} .'
                 }
             }
         }
@@ -65,8 +74,7 @@ pipeline {
         stage('Docker push') {
             steps {
                 script {
-                    // Push the Docker image to the registry
-                    sh 'docker push $DOCKER_IMAGE'
+                    sh 'docker push ${DOCKER_IMAGE}'
                 }
             }
         }
@@ -74,11 +82,12 @@ pipeline {
         stage('Deploy to staging') {
             steps {
                 script {
-                    // Stop and remove any existing container
-                    sh 'docker rm -f $DOCKER_CONTAINER || true'
-
+                    // Remove existing container if any
+                    sh 'docker rm -f ${DOCKER_CONTAINER_NAME} || true'
                     // Run the container
-                    sh 'docker run -d -p 8882:8081 --name $DOCKER_CONTAINER $DOCKER_IMAGE'
+                    sh 'docker run -d -p 8882:8081 --name ${DOCKER_CONTAINER_NAME} ${DOCKER_IMAGE}'
+                    // Give the container some time to start
+                    sleep 30  // Wait 30 seconds to allow the service to start
                 }
             }
         }
@@ -86,10 +95,6 @@ pipeline {
         stage('Acceptance Test') {
             steps {
                 script {
-                    // Ensure the script is executable
-                    sh 'chmod +x acceptance_test.sh'
-                    
-                    // Run the acceptance test script
                     sh './acceptance_test.sh'
                 }
             }
@@ -99,13 +104,10 @@ pipeline {
     post {
         always {
             script {
-                // Clean up by stopping and removing the container after the test
-                sh 'docker stop $DOCKER_CONTAINER || true'
-                sh 'docker rm $DOCKER_CONTAINER || true'
+                // Clean up Docker container after testing
+                sh 'docker stop ${DOCKER_CONTAINER_NAME} || true'
+                sh 'docker rm ${DOCKER_CONTAINER_NAME} || true'
             }
-        }
-        failure {
-            echo 'Pipeline failed!'
         }
     }
 }

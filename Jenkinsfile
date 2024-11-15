@@ -9,7 +9,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                checkout scm  // Ensure this step checks out your repository correctly
             }
         }
         
@@ -86,8 +86,11 @@ pipeline {
         stage('Acceptance Test') {
             steps {
                 script {
+                    // Ensure the script is executable
+                    sh 'chmod +x acceptance_test.sh'
+                    
                     // Run the acceptance test script
-                    sh './test_acceptance.sh'
+                    sh './acceptance_test.sh'
                 }
             }
         }

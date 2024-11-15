@@ -1,13 +1,18 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKER_IMAGE = 'localhost:5000/calculatrice'
+        DOCKER_CONTAINER = 'calculatrice'
+    }
+
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-
+        
         stage('Compilation') {
             steps {
                 sh './gradlew compileJava'
@@ -24,7 +29,7 @@ pipeline {
             steps {
                 sh './gradlew jacocoTestReport'
                 publishHTML(target: [
-                    reportName: 'Rapport JaCoCo',
+                    reportName: 'Code Coverage',
                     reportDir: 'build/reports/jacoco/test/html',
                     reportFiles: 'index.html'
                 ])
@@ -50,28 +55,40 @@ pipeline {
 
         stage('Docker build') {
             steps {
-                sh "docker build -t localhost:5000/calculatrice ."
+                script {
+                    // Build the Docker image
+                    sh 'docker build -t $DOCKER_IMAGE .'
+                }
             }
         }
 
         stage('Docker push') {
             steps {
-                sh "docker push localhost:5000/calculatrice"
+                script {
+                    // Push the Docker image to the registry
+                    sh 'docker push $DOCKER_IMAGE'
+                }
             }
         }
 
-        stage("Deploy to staging ou déployer en préproduction") {
+        stage('Deploy to staging') {
             steps {
-                sh "docker rm -f calculatrice || true"
-                sh "docker run -d -p 8882:8081 --name calculatrice localhost:5000/calculatrice"
+                script {
+                    // Stop and remove any existing container
+                    sh 'docker rm -f $DOCKER_CONTAINER || true'
+
+                    // Run the container
+                    sh 'docker run -d -p 8882:8081 --name $DOCKER_CONTAINER $DOCKER_IMAGE'
+                }
             }
         }
 
-        stage("Acceptance test") {
+        stage('Acceptance Test') {
             steps {
-                sleep 60
-                // Use bash explicitly to run the acceptance test script
-                sh "chmod +x acceptance_test.sh && bash ./acceptance_test.sh"
+                script {
+                    // Run the acceptance test script
+                    sh './test_acceptance.sh'
+                }
             }
         }
     }
@@ -79,15 +96,13 @@ pipeline {
     post {
         always {
             script {
-                try {
-                    // Check if the container exists before stopping/removing
-                    sh "docker ps -q -f name=calculatrice || true"  // This checks if the container is running
-                    sh "docker stop calculatrice || true"
-                    sh "docker rm calculatrice || true"
-                } catch (Exception e) {
-                    echo "Aucun conteneur Docker à arrêter"
-                }
+                // Clean up by stopping and removing the container after the test
+                sh 'docker stop $DOCKER_CONTAINER || true'
+                sh 'docker rm $DOCKER_CONTAINER || true'
             }
+        }
+        failure {
+            echo 'Pipeline failed!'
         }
     }
 }

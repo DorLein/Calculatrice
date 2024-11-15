@@ -1,21 +1,25 @@
 pipeline {
     agent any
+
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
+
         stage('Compilation') {
             steps {
                 sh './gradlew compileJava'
             }
         }
+
         stage('Test unitaire') {
             steps {
                 sh './gradlew test'
             }
         }
+
         stage('Couverture de code') {
             steps {
                 sh './gradlew jacocoTestReport'
@@ -26,6 +30,7 @@ pipeline {
                 ])
             }
         }
+
         stage('Analyse statique du code') {
             steps {
                 sh './gradlew checkstyleMain'
@@ -36,40 +41,40 @@ pipeline {
                 ])
             }
         }
+
         stage('Package') {
             steps {
                 sh './gradlew build'
             }
         }
+
         stage('Docker build') {
             steps {
                 sh "docker build -t localhost:5000/calculatrice ."
             }
         }
+
         stage('Docker push') {
             steps {
                 sh "docker push localhost:5000/calculatrice"
             }
         }
-        stage('Déploiement sur staging') {
-            when {
-                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
-            }
+
+        stage("Deploy to staging ou déployer en préproduction") {
             steps {
-                echo 'Déploiement en cours...'
-                // Ajoutez ici les commandes pour le déploiement en staging
+                sh "docker rm -f calculatrice || true"
+                sh "docker run -d --rm -p 8882:8081 --name calculatrice localhost:5000/calculatrice"
             }
         }
-        stage('Test d\'acceptation') {
-            when {
-                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
-            }
+
+        stage("Acceptance test") {
             steps {
-                echo 'Tests d\'acceptation en cours...'
-                // Ajoutez ici les tests d'acceptation
+                sleep 60
+                sh "chmod +x acceptance_test.sh && ./acceptance_test.sh"
             }
         }
     }
+
     post {
         always {
             script {

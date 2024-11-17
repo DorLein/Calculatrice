@@ -8,6 +8,11 @@ pipeline {
                 sh "./gradlew compileJava"
             }
         }
+         stage("test unitaire"){
+            steps{
+                sh "./gradlew test"
+            }
+        }
        
  }
 }
